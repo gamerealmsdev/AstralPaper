@@ -29,7 +29,7 @@ get_pr_base_commit() {
     # Get merge base between PR head and base branch
     cd "${work_dir}/pr"
     local merge_base
-    merge_base=$(git merge-base HEAD "origin/ver/1.21.3")
+    merge_base=$(git merge-base HEAD "origin/ver/1.21.4")
     cd - > /dev/null
     echo "$merge_base"
 }

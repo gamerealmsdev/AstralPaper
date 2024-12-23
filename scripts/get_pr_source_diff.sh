@@ -11,7 +11,7 @@ OUTPUT_DIR="output"
 if [ ! -d "$OLD_REPO_PATH" ]; then
     git clone https://github.com/PaperMC/Paper-archive.git -b ver/1.21.3 "$OLD_REPO_PATH"
 else
-    echo "Directory $TARGET_DIR already exists. Skipping clone."
+    echo "Directory $OLD_REPO_PATH already exists. Skipping clone."
 fi
 
 cleanup() {

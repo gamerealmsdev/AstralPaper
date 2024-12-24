@@ -76,7 +76,7 @@ extract_source_diff() {
         sed 's|Paper-API/src/main/java|paper-api/src/main/java|g' "$api_diff"
         sed -E '
             # If path contains net/minecraft or com/mojang, use vanilla path
-            /(net\/minecraft|com\/mojang)/ s|Paper-Server/src/main/java|paper-server/src/vanilla/java|g
+            /(net\/minecraft|com\/mojang)/ s|Paper-Server/src/main/java|paper-server/src/minecraft/java|g
             # Otherwise use regular java path
             /(net\/minecraft|com\/mojang)/ !s|Paper-Server/src/main/java|paper-server/src/main/java|g
         ' "$server_diff"

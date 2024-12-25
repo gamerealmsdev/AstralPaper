@@ -1,0 +1,19 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: gamerealmsdev <gamerealmsmc@gmail.com>
+Date: Wed, 25 Dec 2024 17:03:08 +0800
+Subject: [PATCH] Made OptionException vague
+
+
+diff --git a/src/main/java/org/bukkit/craftbukkit/Main.java b/src/main/java/org/bukkit/craftbukkit/Main.java
+index 1c2439ffc1e407ff69286817d22f127470ce07ba..8be2e2ef04208818fcf7d567da611d3d2774a9c2 100644
+--- a/src/main/java/org/bukkit/craftbukkit/Main.java
++++ b/src/main/java/org/bukkit/craftbukkit/Main.java
+@@ -190,7 +190,7 @@ public class Main {
+ 
+         try {
+             options = parser.parse(args);
+-        } catch (joptsimple.OptionException ex) {
++        } catch (Exception ex) {
+             Logger.getLogger(Main.class.getName()).log(Level.SEVERE, ex.getLocalizedMessage());
+         }
+ 

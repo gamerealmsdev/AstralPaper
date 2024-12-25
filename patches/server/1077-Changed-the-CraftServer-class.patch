@@ -1,0 +1,199 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: gamerealmsdev <gamerealmsmc@gmail.com>
+Date: Wed, 25 Dec 2024 16:58:35 +0800
+Subject: [PATCH] Changed the CraftServer class
+
+
+diff --git a/src/main/java/org/bukkit/craftbukkit/CraftServer.java b/src/main/java/org/bukkit/craftbukkit/CraftServer.java
+index 97b5d6ba2b19a7c730730c74175a29157aed1840..7a948cc985a41997f69ea0f4aba1a6e04cfccce1 100644
+--- a/src/main/java/org/bukkit/craftbukkit/CraftServer.java
++++ b/src/main/java/org/bukkit/craftbukkit/CraftServer.java
+@@ -269,7 +269,7 @@ import javax.annotation.Nullable; // Paper
+ import javax.annotation.Nonnull; // Paper
+ 
+ public final class CraftServer implements Server {
+-    private final String serverName = io.papermc.paper.ServerBuildInfo.buildInfo().brandName(); // Paper
++    private final String serverName = "AstralPaper";
+     private final String serverVersion;
+     private final String bukkitVersion = Versioning.getBukkitVersion();
+     private final Logger logger = Logger.getLogger("Minecraft");
+@@ -1454,6 +1454,179 @@ public final class CraftServer implements Server {
+         return internal.getWorld();
+     }
+ 
++    @Override
++    public World createWorld(WorldCreator creator, File directory) {
++        Preconditions.checkState(this.console.getAllLevels().iterator().hasNext(), "Cannot create additional worlds on STARTUP");
++        //Preconditions.checkState(!this.console.isIteratingOverLevels, "Cannot create a world while worlds are being ticked"); // Paper - Cat - Temp disable. We'll see how this goes.
++        Preconditions.checkArgument(creator != null, "WorldCreator cannot be null");
++
++        String name = creator.name();
++        ChunkGenerator generator = creator.generator();
++        BiomeProvider biomeProvider = creator.biomeProvider();
++        File folder = new File(directory, name);
++        World world = this.getWorld(name);
++
++        // Paper start
++        World worldByKey = this.getWorld(creator.key());
++        if (world != null || worldByKey != null) {
++            if (world == worldByKey) {
++                return world;
++            }
++            throw new IllegalArgumentException("Cannot create a world with key " + creator.key() + " and name " + name + " one (or both) already match a world that exists");
++        }
++        // Paper end
++
++        if (folder.exists()) {
++            Preconditions.checkArgument(folder.isDirectory(), "File (%s) exists and isn't a folder", name);
++        }
++
++        if (generator == null) {
++            generator = this.getGenerator(name);
++        }
++
++        if (biomeProvider == null) {
++            biomeProvider = this.getBiomeProvider(name);
++        }
++
++        ResourceKey<LevelStem> actualDimension;
++        switch (creator.environment()) {
++            case NORMAL:
++                actualDimension = LevelStem.OVERWORLD;
++                break;
++            case NETHER:
++                actualDimension = LevelStem.NETHER;
++                break;
++            case THE_END:
++                actualDimension = LevelStem.END;
++                break;
++            default:
++                throw new IllegalArgumentException("Illegal dimension (" + creator.environment() + ")");
++        }
++
++        LevelStorageSource.LevelStorageAccess worldSession;
++        try {
++            worldSession = LevelStorageSource.createDefault(directory.toPath()).validateAndCreateAccess(name, actualDimension);
++        } catch (IOException | ContentValidationException ex) {
++            throw new RuntimeException(ex);
++        }
++
++        Dynamic<?> dynamic;
++        if (worldSession.hasWorldData()) {
++            net.minecraft.world.level.storage.LevelSummary worldinfo;
++
++            try {
++                dynamic = worldSession.getDataTag();
++                worldinfo = worldSession.getSummary(dynamic);
++            } catch (NbtException | ReportedNbtException | IOException ioexception) {
++                LevelStorageSource.LevelDirectory convertable_b = worldSession.getLevelDirectory();
++
++                MinecraftServer.LOGGER.warn("Failed to load world data from {}", convertable_b.dataFile(), ioexception);
++                MinecraftServer.LOGGER.info("Attempting to use fallback");
++
++                try {
++                    dynamic = worldSession.getDataTagFallback();
++                    worldinfo = worldSession.getSummary(dynamic);
++                } catch (NbtException | ReportedNbtException | IOException ioexception1) {
++                    MinecraftServer.LOGGER.error("Failed to load world data from {}", convertable_b.oldDataFile(), ioexception1);
++                    MinecraftServer.LOGGER.error("Failed to load world data from {} and {}. World files may be corrupted. Shutting down.", convertable_b.dataFile(), convertable_b.oldDataFile());
++                    return null;
++                }
++
++                worldSession.restoreLevelDataFromOld();
++            }
++
++            if (worldinfo.requiresManualConversion()) {
++                MinecraftServer.LOGGER.info("This world must be opened in an older version (like 1.6.4) to be safely converted");
++                return null;
++            }
++
++            if (!worldinfo.isCompatible()) {
++                MinecraftServer.LOGGER.info("This world was created by an incompatible version.");
++                return null;
++            }
++        } else {
++            dynamic = null;
++        }
++
++        boolean hardcore = creator.hardcore();
++
++        PrimaryLevelData worlddata;
++        WorldLoader.DataLoadContext worldloader_a = this.console.worldLoader;
++        RegistryAccess.Frozen iregistrycustom_dimension = worldloader_a.datapackDimensions();
++        net.minecraft.core.Registry<LevelStem> iregistry = iregistrycustom_dimension.lookupOrThrow(Registries.LEVEL_STEM);
++        if (dynamic != null) {
++            LevelDataAndDimensions leveldataanddimensions = LevelStorageSource.getLevelDataAndDimensions(dynamic, worldloader_a.dataConfiguration(), iregistry, worldloader_a.datapackWorldgen());
++
++            worlddata = (PrimaryLevelData) leveldataanddimensions.worldData();
++            iregistrycustom_dimension = leveldataanddimensions.dimensions().dimensionsRegistryAccess();
++        } else {
++            LevelSettings worldsettings;
++            WorldOptions worldoptions = new WorldOptions(creator.seed(), creator.generateStructures(), false);
++            WorldDimensions worlddimensions;
++
++            DedicatedServerProperties.WorldDimensionData properties = new DedicatedServerProperties.WorldDimensionData(GsonHelper.parse((creator.generatorSettings().isEmpty()) ? "{}" : creator.generatorSettings()), creator.type().name().toLowerCase(Locale.ROOT));
++
++            worldsettings = new LevelSettings(name, GameType.byId(this.getDefaultGameMode().getValue()), hardcore, Difficulty.EASY, false, new GameRules(worldloader_a.dataConfiguration().enabledFeatures()), worldloader_a.dataConfiguration());
++            worlddimensions = properties.create(worldloader_a.datapackWorldgen());
++
++            WorldDimensions.Complete worlddimensions_b = worlddimensions.bake(iregistry);
++            Lifecycle lifecycle = worlddimensions_b.lifecycle().add(worldloader_a.datapackWorldgen().allRegistriesLifecycle());
++
++            worlddata = new PrimaryLevelData(worldsettings, worldoptions, worlddimensions_b.specialWorldProperty(), lifecycle);
++            iregistrycustom_dimension = worlddimensions_b.dimensionsRegistryAccess();
++        }
++        iregistry = iregistrycustom_dimension.lookupOrThrow(Registries.LEVEL_STEM);
++        worlddata.customDimensions = iregistry;
++        worlddata.checkName(name);
++        worlddata.setModdedInfo(this.console.getServerModName(), this.console.getModdedStatus().shouldReportAsModified());
++
++        if (this.console.options.has("forceUpgrade")) {
++            net.minecraft.server.Main.forceUpgrade(worldSession, DataFixers.getDataFixer(), this.console.options.has("eraseCache"), () -> true, iregistrycustom_dimension, this.console.options.has("recreateRegionFiles"));
++        }
++
++        long j = BiomeManager.obfuscateSeed(worlddata.worldGenOptions().seed()); // Paper - use world seed
++        List<CustomSpawner> list = ImmutableList.of(new PhantomSpawner(), new PatrolSpawner(), new CatSpawner(), new VillageSiege(), new WanderingTraderSpawner(worlddata));
++        LevelStem worlddimension = iregistry.getValue(actualDimension);
++
++        WorldInfo worldInfo = new CraftWorldInfo(worlddata, worldSession, creator.environment(), worlddimension.type().value(), worlddimension.generator(), this.getHandle().getServer().registryAccess()); // Paper - Expose vanilla BiomeProvider from WorldInfo
++        if (biomeProvider == null && generator != null) {
++            biomeProvider = generator.getDefaultBiomeProvider(worldInfo);
++        }
++
++        ResourceKey<net.minecraft.world.level.Level> worldKey;
++        String levelName = this.getServer().getProperties().levelName;
++        if (name.equals(levelName + "_nether")) {
++            worldKey = net.minecraft.world.level.Level.NETHER;
++        } else if (name.equals(levelName + "_the_end")) {
++            worldKey = net.minecraft.world.level.Level.END;
++        } else {
++            worldKey = ResourceKey.create(Registries.DIMENSION, ResourceLocation.fromNamespaceAndPath(creator.key().namespace(), creator.key().value()));
++        }
++
++        // If set to not keep spawn in memory (changed from default) then adjust rule accordingly
++        if (creator.keepSpawnLoaded() == net.kyori.adventure.util.TriState.FALSE) { // Paper
++            worlddata.getGameRules().getRule(GameRules.RULE_SPAWN_CHUNK_RADIUS).set(0, null);
++        }
++        ServerLevel internal = (ServerLevel) new ServerLevel(this.console, this.console.executor, worldSession, worlddata, worldKey, worlddimension, this.getServer().progressListenerFactory.create(worlddata.getGameRules().getInt(GameRules.RULE_SPAWN_CHUNK_RADIUS)),
++            worlddata.isDebugWorld(), j, creator.environment() == Environment.NORMAL ? list : ImmutableList.of(), true, this.console.overworld().getRandomSequences(), creator.environment(), generator, biomeProvider);
++
++        if (!(this.worlds.containsKey(name.toLowerCase(Locale.ROOT)))) {
++            return null;
++        }
++
++        this.console.addLevel(internal); // Paper - Put world into worldlist before initing the world; move up
++        this.console.initWorld(internal, worlddata, worlddata, worlddata.worldGenOptions());
++
++        internal.setSpawnSettings(true);
++        // Paper - Put world into worldlist before initing the world; move up
++
++        this.getServer().prepareLevels(internal.getChunkSource().chunkMap.progressListener, internal);
++        // Paper - rewrite chunk system
++
++        this.pluginManager.callEvent(new WorldLoadEvent(internal.getWorld()));
++        return internal.getWorld();
++    }
++
+     @Override
+     public boolean unloadWorld(String name, boolean save) {
+         return this.unloadWorld(this.getWorld(name), save);

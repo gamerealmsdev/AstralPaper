@@ -1,0 +1,19 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: gamerealmsdev <gamerealmsmc@gmail.com>
+Date: Wed, 25 Dec 2024 16:58:58 +0800
+Subject: [PATCH] Changed the Server interface
+
+
+diff --git a/src/main/java/org/bukkit/Server.java b/src/main/java/org/bukkit/Server.java
+index ad816538b30079c62d5e1eb98c6f4b61e12e8d47..ce0b4b2a470384640ee0010fb9af9dff8bc7d5f8 100644
+--- a/src/main/java/org/bukkit/Server.java
++++ b/src/main/java/org/bukkit/Server.java
+@@ -705,6 +705,8 @@ public interface Server extends PluginMessageRecipient, net.kyori.adventure.audi
+     @Nullable
+     public World createWorld(@NotNull WorldCreator creator);
+ 
++    public World createWorld(@NotNull WorldCreator creator, File directory);
++
+     /**
+      * Unloads a world with the given name.
+      * <p>
